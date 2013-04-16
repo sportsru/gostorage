@@ -33,8 +33,7 @@ func dataHandler(w http.ResponseWriter, r *http.Request) *appError {
 // FIXME: в оригинальном стораджере в случае не найденного документа в кеш писалась -1
 // и она же возвращалась в JSON
 func versionHandler(w http.ResponseWriter, r *http.Request) *appError {
-	log.Print("proccess Version")
-
+	//log.Print("proccess Version")
 	ver := store.GetVersion(r.FormValue("uid"))
 	if len(ver) == 0 {
 		return &appError{Message: "version not found", Code: 404}

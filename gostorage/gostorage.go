@@ -102,7 +102,8 @@ func (c *Client) SetData(uid string, fields map[string]interface{}) error {
 	store := session.DB(c.Cfg.Mongo.Db).C("Storage")
 
 	if c.Debug {
-		fmt.Println("fields: ")
+		fmt.Println("SetData")
+		fmt.Print("fields: ")
 		spew.Dump(fields)
 	}
 
@@ -114,6 +115,7 @@ func (c *Client) SetData(uid string, fields map[string]interface{}) error {
 		ReturnNew: true,
 		Upsert:    true,
 	}
+
 	resultUps := Storage{}
 	info, err := store.Find(bson.M{"uid": uid}).Apply(change, &resultUps)
 
