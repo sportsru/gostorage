@@ -32,7 +32,7 @@ type Storage struct {
 	Uid string
 	// Data Mixed
 	// Data interface{}
-	Data map[string]string
+	Data map[string]interface{}
 	Tags map[string]int32
 	// Tags Mixed
 	Version    int64

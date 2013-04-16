@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	//"io/ioutil"
 	//"github.com/sportsru/gostorage/gostorage"
 	"log"
 	"net/http"
@@ -10,14 +12,14 @@ import (
 	//"time"
 )
 
-func dataHandler(w http.ResponseWriter, r *http.Request) *appError {
+func dataHandler(hd *HandlerData, w http.ResponseWriter, r *http.Request) *appError {
 	log.Print("proccess Data")
 	var out string
 	if r.FormValue("counter") == "" {
-		out = store.GetDataJSON(r.FormValue("uid"))
+		out = store.GetDataJSON(hd.uid)
 	} else {
 		// get tags here
-		out = store.GetDataJSON(r.FormValue("uid"))
+		out = store.GetDataJSON(hd.uid)
 	}
 
 	// check err instead of out
@@ -29,12 +31,9 @@ func dataHandler(w http.ResponseWriter, r *http.Request) *appError {
 	return nil
 }
 
-// GET
-// FIXME: в оригинальном стораджере в случае не найденного документа в кеш писалась -1
-// и она же возвращалась в JSON
-func versionHandler(w http.ResponseWriter, r *http.Request) *appError {
+func versionHandler(hd *HandlerData, w http.ResponseWriter, r *http.Request) *appError {
 	//log.Print("proccess Version")
-	ver := store.GetVersion(r.FormValue("uid"))
+	ver := store.GetVersion(hd.uid)
 	if len(ver) == 0 {
 		return &appError{Message: "version not found", Code: 404}
 	}
@@ -43,8 +42,7 @@ func versionHandler(w http.ResponseWriter, r *http.Request) *appError {
 	return nil
 }
 
-func setCounterHandler(w http.ResponseWriter, r *http.Request) *appError {
-	uid := r.FormValue("uid")
+func setCounterHandler(hd *HandlerData, w http.ResponseWriter, r *http.Request) *appError {
 	tagStr := r.FormValue("tg")
 	if tagStr == "" {
 		fmt.Fprintf(w, "")
@@ -62,42 +60,33 @@ func setCounterHandler(w http.ResponseWriter, r *http.Request) *appError {
 	}
 
 	// TODO: process errors
-	_ = store.SetTags(uid, tagFields)
+	_ = store.SetTags(hd.uid, tagFields)
 	fmt.Fprintf(w, "OK")
 	return nil
 }
 
-func setHandler(w http.ResponseWriter, r *http.Request) *appError {
-	processSetReq(r)
-
-	//fields := make(map[string]interface{})
-	fmt.Fprintf(w, "OK")
-	//"Hi there, it's set handler!"
-
-	//log.Print("proccess Set")
-	return nil
-}
-
-// TODO: add return values
-func processSetReq(r *http.Request) {
-	//log.Print("Method: " + r.Method)
-	uid := r.FormValue("uid")
+func setHandler(hd *HandlerData, w http.ResponseWriter, r *http.Request) *appError {
+	if !hd.isPost {
+		return nil
+	}
 
 	fields := make(map[string]interface{})
-	for paramName := range r.Form {
-		if paramName == "uid" {
-			fields[paramName] = r.FormValue(paramName)
-			continue
-		}
-		log.Print("Param: ", paramName)
-		spew.Dump(r.FormValue(paramName))
-		fields["data."+paramName] = r.FormValue(paramName)
+	if err := json.Unmarshal(hd.body, &fields); err != nil {
+		panic("PARSE ERROR: " + string(err.Error()) +
+			"\n" + string(hd.body))
 	}
 
+	fSet := make(map[string]interface{})
+	for key, value := range fields {
+		fSet["data."+key] = value
+	}
+	fSet["uid"] = hd.uid
 	if cliCfg.debug {
-		fmt.Print("fields in handler: ")
-		spew.Dump(fields)
+		fmt.Print("fields in SET handler: ")
+		spew.Dump(fSet)
 	}
 
-	_ = store.SetData(uid, fields)
+	_ = store.SetData(hd.uid, fSet)
+	fmt.Fprintf(w, "OK")
+	return nil
 }

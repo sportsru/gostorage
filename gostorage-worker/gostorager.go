@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sportsru/gostorage/gostorage"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -77,7 +78,13 @@ type appError struct {
 	Code    int
 }
 
-type appHandler func(http.ResponseWriter, *http.Request) *appError
+type HandlerData struct {
+	uid    string
+	body   []byte
+	isPost bool
+}
+
+type appHandler func(*HandlerData, http.ResponseWriter, *http.Request) *appError
 
 // implement ServeHTTP for appHanlers
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +96,22 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	hData := &HandlerData{isPost: false}
+
+	// XXX: важно! чтение body должно быть ДО парсинга формы 
+	// (возможно это как-то можно обойти, но я пока не знаю как)
+	if r.Method == "POST" {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			panic("read request body ERROR: " + string(err.Error()))
+		}
+		//fmt.Println("Body: ", string(body))
+		hData.body = body
+		hData.isPost = true
+	}
 	uid := r.FormValue("uid")
+	// fmt.Println("uid=", uid)
+
 	if len(uid) == 0 {
 		http.Error(w, "", http.StatusNotFound)
 		return
@@ -97,9 +119,11 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if cliCfg.debug {
 		log.Print("uid: ", uid)
 	}
+	hData.uid = uid
 
 	// TODO: add data struct to return values of fn 
-	if e := fn(w, r); e != nil { // e is *appError, not os.Error.
+	// XXX: не получилось использовать hData как reciever – надо разобраться можно ли так сделать
+	if e := fn(hData, w, r); e != nil { // e is *appError, not os.Error.
 		fmt.Errorf("%v", e.Error)
 		http.Error(w, e.Message, e.Code)
 	}
