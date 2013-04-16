@@ -68,6 +68,7 @@ func (c *Client) SetTags(uid string, fields map[string]interface{}) error {
 
 	store := session.DB(c.Cfg.Mongo.Db).C("Storage")
 
+	fields["verison"] = 0
 	timestamp := int64(time.Now().Unix() / 1000)
 	change := mgo.Change{
 		Update: bson.M{
