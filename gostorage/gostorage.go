@@ -68,7 +68,7 @@ func (c *Client) SetTags(uid string, fields map[string]interface{}) error {
 
 	store := session.DB(c.Cfg.Mongo.Db).C("Storage")
 
-	fields["verison"] = 0
+	fields["version"] = 0
 	timestamp := int64(time.Now().Unix() / 1000)
 	change := mgo.Change{
 		Update: bson.M{
@@ -137,13 +137,13 @@ func (c *Client) GetTagsJSON(uid string) string {
 	if doc == nil {
 		return ""
 	}
+	if len(doc.Tags) == 0 {
+		return "{}"
+	}
 
 	res, err := json.Marshal(doc.Tags)
 	if err != nil {
 		panic("json marshal error: " + string(err.Error()))
-	}
-	if len(res) == 0 {
-		return "{}"
 	}
 
 	return string(res)
@@ -156,14 +156,14 @@ func (c *Client) GetDataJSON(uid string) string {
 		return ""
 	}
 
+	if len(doc.Data) == 0 {
+		return "{}"
+	}
+
 	res, err := json.Marshal(doc.Data)
 	if err != nil {
 		panic("json marshal error: " + string(err.Error()))
 	}
-	if len(res) == 0 {
-		return "{}"
-	}
-
 	return string(res)
 }
 

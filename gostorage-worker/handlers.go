@@ -40,7 +40,7 @@ func versionHandler(w http.ResponseWriter, r *http.Request) *appError {
 		return &appError{Message: "version not found", Code: 404}
 	}
 
-	fmt.Fprintf(w, "{version: "+ver+"}\n")
+	fmt.Fprintf(w, "{\"version\": "+ver+"}\n")
 	return nil
 }
 
@@ -64,6 +64,7 @@ func setCounterHandler(w http.ResponseWriter, r *http.Request) *appError {
 
 	// TODO: process errors
 	_ = store.SetTags(uid, tagFields)
+	fmt.Fprintf(w, "OK")
 	return nil
 }
 
@@ -71,7 +72,7 @@ func setHandler(w http.ResponseWriter, r *http.Request) *appError {
 	processSetReq(r)
 
 	//fields := make(map[string]interface{})
-	fmt.Fprintf(w, "")
+	fmt.Fprintf(w, "OK")
 	//"Hi there, it's set handler!"
 
 	//log.Print("proccess Set")
