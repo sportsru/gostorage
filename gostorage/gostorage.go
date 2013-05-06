@@ -3,6 +3,7 @@ package gostorage
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/davecgh/go-spew/spew"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -13,6 +14,7 @@ import (
 type Client struct {
 	Cfg            Config
 	MgoSession     *mgo.Session
+	MemClient      *memcache.Client
 	Verbose, Debug bool
 }
 
@@ -21,8 +23,14 @@ type MongoCfg struct {
 	Db  string
 }
 
+type MemcacheCfg struct {
+	Servers   []string
+	NameSpace string
+}
+
 type Config struct {
 	Mongo          MongoCfg
+	Memcache       MemcacheCfg
 	Verbose, Debug bool
 }
 
@@ -56,6 +64,12 @@ func New(cfg Config) *Client {
 		panic(err)
 	}
 	c.MgoSession = session
+
+	c.MemClient = memcache.New(cfg.Memcache.Servers...)
+	if cfg.Debug {
+		fmt.Print("memcache servers: ")
+		spew.Dump(cfg.Memcache.Servers)
+	}
 
 	c.Verbose = cfg.Verbose
 	c.Debug = cfg.Debug
@@ -129,6 +143,10 @@ func (c *Client) SetData(uid string, fields map[string]interface{}) error {
 	if err != nil {
 		panic(err)
 	}
+
+	// XXX: not sure here 
+	c.Uncache(uid, resultUps.Version)
+	//c.Uncache(uid, resultUps.Version+1) // <-- race condition here ?
 
 	return nil
 }
@@ -204,9 +222,50 @@ func (c *Client) GetVersion(uid string) string {
 	version := int64(-1)
 	if doc != nil {
 		version = doc.Version
+		// XXX: nit sure here
+		c.Uncache(uid, version)
 	}
 
 	return strconv.FormatInt(version, 10)
+}
+
+func (c *Client) Uncache(uid string, version int64) {
+	key1 := c.Cfg.Memcache.NameSpace + uid
+	//value := []byte(string(version))
+	value := []byte("{version: " + strconv.FormatInt(version, 10) + "}")
+	// TODO: use const for Expiration value
+	setItem := &memcache.Item{
+		Key:        key1,
+		Value:      value,
+		Expiration: 2 * 24 * 60 * 60,
+	}
+	if c.Debug {
+		spew.Dump(setItem)
+	}
+	setErr := c.MemClient.Set(setItem)
+
+	// XXX: gentle Set error processing
+	if setErr != nil {
+		panic("set cache failed: " + string(setErr.Error()))
+	}
+
+	// XXX: gentle Cas error processing
+	// ErrCacheMiss
+	item, getErr := c.MemClient.Get(key1)
+	// check: Is cas_id here?
+	if c.Debug {
+		spew.Dump(item)
+	}
+
+	if getErr != nil {
+		panic("get cache failed: " + string(getErr.Error()))
+	}
+	casErr := c.MemClient.CompareAndSwap(item)
+	// TODO: check ErrCASConflict
+	_ = casErr
+	//spew.Dump(casErr)
+
+	//it, err := c.Mem.Get(key1)
 }
 
 // http://denis.papathanasiou.org/2012/10/14/go-golang-and-mongodb-using-mgo/

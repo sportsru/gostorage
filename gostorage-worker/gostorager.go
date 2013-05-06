@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	/*
@@ -22,7 +23,8 @@ var store *gostorage.Client
 var storeCfg gostorage.Config
 
 var cliCfg struct {
-	port, address, mongo string // don't use
+	port, address, mongo string
+	memcache, memPrefix  string
 	verbose, debug       bool
 }
 
@@ -30,6 +32,8 @@ func init() {
 	flag.StringVar(&cliCfg.address, "address", "0.0.0.0", "service address")
 	flag.StringVar(&cliCfg.port, "port", "9002", "service port")
 	flag.StringVar(&cliCfg.mongo, "mongo", "127.0.0.1", "MongoDB connection string")
+	flag.StringVar(&cliCfg.memcache, "memcache", "127.0.0.1", "Memcache servers list, splited by comma")
+	flag.StringVar(&cliCfg.memPrefix, "memcache-prefix", "s_", "Memcache keys prefix")
 
 	flag.BoolVar(&cliCfg.verbose, "verbose", false, "Log requests")
 	flag.BoolVar(&cliCfg.debug, "debug", false, "Debugging")
@@ -43,10 +47,22 @@ Run 'gostorage-worker -h' for flags description.
 		os.Exit(1)
 	}
 
+	var memServers []string
+	for _, serv := range strings.Split(cliCfg.memcache, ",") {
+		if strings.Index(serv, ":") == -1 {
+			serv = serv + ":11211"
+		}
+		memServers = append(memServers, serv)
+	}
+
 	//cpuprofile := flag.String("cpuprofile", "", "Write CPU profile to file")
 	//memprofile := flag.String("memprofile", "", "Write memory profile to file")
 
 	//storeCfg.Storage = gostorage.StorageCfg{"0.0.0.0", "9002"}
+	storeCfg.Memcache = gostorage.MemcacheCfg{
+		Servers:   memServers,
+		NameSpace: cliCfg.memPrefix,
+	}
 	storeCfg.Mongo = gostorage.MongoCfg{Url: cliCfg.mongo, Db: "default"}
 	storeCfg.Debug = cliCfg.debug
 	storeCfg.Verbose = cliCfg.verbose
